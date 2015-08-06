@@ -1,0 +1,45 @@
+#!/bin/bash
+
+ #%# family=auto
+ #%# capabilities=autoconf suggest
+
+POOL=${0##*phpfpm_}
+cd /etc/php-fpm.d/
+case $1 in
+   config)
+	value=`cat /etc/php-fpm.d/$POOL.conf | awk '$1 == "listen" {print($3)}'`
+	echo "graph_title PHP-FPM status on pool: $POOL $value"
+	echo "graph_args --base 1024 -l 0"
+	echo "graph_vlabel Connections"
+	echo "graph_category PHP"
+	echo "graph_order idle active total"
+	echo "idle.label idle"
+	echo "idle.draw AREA"
+	echo "active.label active"
+	echo "active.draw AREA"
+	echo "total.label total"
+	echo "total.draw STACK";
+    exit 0;;
+   suggest)
+    sed -n -e 's/^\[\(.*\)\]$/\1/p' /etc/php-fpm.d/*.conf
+    exit 0;;
+   autoconf)
+        if [[ ! -f /usr/bin/cgi-fcgi ]]; then
+            echo "no (/usr/bin/cgi-fcgi not found)"
+            exit 0
+        elif [[ ! -f /usr/sbin/php-fpm ]]; then
+            echo "no (/usr/bin/php-fpm not found)"
+            exit 0
+        else 
+	    echo yes
+	    exit 0
+	fi
+        ;;
+esac
+
+
+	socket=` awk '$1 == "listen" {print($3)}' /etc/php-fpm.d/$POOL.conf`
+	SCRIPT_NAME=/status SCRIPT_FILENAME=/status  REQUEST_METHOD=GET cgi-fcgi -bind -connect $socket | sed -n -e 's/^\(.*\)\ processes:\ *\(.*\)/\1 \2/p' | grep -v max | while read key value; do 
+        	echo "$key.value $value";
+done;
+
